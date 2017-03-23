@@ -1,6 +1,6 @@
 //
 //  Obstacle.swift
-//  hibernate
+//  Spacebear
 //
 //  Created by Justin Hershey on 3/15/17.
 //  Copyright © 2017 Fenapnu. All rights reserved.
@@ -11,57 +11,107 @@ import SpriteKit
 
 class Obstacle {
     
-    let location: CGPoint
     let frame: CGRect
+    let playerScalingFactor: CGFloat
+    let playerWidth: CGFloat
     
-    init(point: CGPoint, frame:CGRect){
+    
+    init(frame:CGRect){
         
-        self.location = point
+        
         self.frame = frame
+        self.playerScalingFactor = 10.0
+        self.playerWidth = self.frame.width / playerScalingFactor
+        
     }
     
     
-    /**********************************
+    /****************************************************************************
+     *
      *  OBSTACAL CHOOSING METHOD
-     ***********************************/
+     *
+     *****************************************************************************/
     
-    func addObstacle() -> SKShapeNode{
+    func addObstacle() -> SKSpriteNode{
         
-        let temp = self.random(min:0, max:3)
-        let random = Int(temp)
+        let oTemp = self.random(min:0, max:5)
+        let oRandom = Int(oTemp)
         
-        var obstacleNode = SKShapeNode()
-//        print(random)
-        
-        let rad = self.random(min: self.frame.size.width/8, max: self.frame.width/4)
+        //
+//        let eTemp = self.random(min:0, max:9)
+//        let eRandom = Int(eTemp)
+//        
+//        //1 in 9 chance of adding a wormhole engine
+//        if(eRandom == 1 ){
+//            
+//            let scalingFactor: CGFloat = 1.0
+//            
+//            let engineNode = addEngine(origin: randomLocation(min:1, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
+//            engineNode.physicsBody?.isDynamic = true
+//            engineNode.physicsBody?.usesPreciseCollisionDetection = true
+//            engineNode.physicsBody?.affectedByGravity = false
+//            
+//            
+//            //collision Masks
+//            engineNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
+//            engineNode.physicsBody?.collisionBitMask = PhysicsCategory.None | PhysicsCategory.Remove
+//            engineNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
+//            engineNode.physicsBody?.categoryBitMask = PhysicsCategory.Obstacle
+//        
+//        }
+    
+        var obstacleNode = SKSpriteNode()
 
-        switch random {
+
+        switch oRandom {
             
-        case 0:
+            case 0:
+                
+                let scalingFactor: CGFloat = 3.0
+                
+                obstacleNode = addWormhole(origin: randomLocation(min:0, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
             
-            obstacleNode = addWormhole(radius: rad)
+            case 1 :
             
-        case 1:
+                
+                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 3, max: playerScalingFactor/1.2 ))
+                
+                obstacleNode = addBlackhole(origin: randomLocation(min:0, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
             
-            obstacleNode = addBlackhole(radius: rad)
-        case 2:
             
-            obstacleNode = addStar(radius: rad)
+            default:
+                
+                print("Default Obstacle Case - Star")
+                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 2, max: playerScalingFactor/2))
+                
+                obstacleNode = addStar(origin: randomLocation(min:2, max: playerScalingFactor/2, scalor: scalingFactor), scalingFactor: scalingFactor)
             
-        default:
-            
-            //do something for nothing
-            obstacleNode = addBlackhole(radius: 0)
-            print("Add nothing")
         }
+        
+        obstacleNode.physicsBody?.isDynamic = true
+        obstacleNode.physicsBody?.usesPreciseCollisionDetection = true
+        obstacleNode.physicsBody?.affectedByGravity = false
+        obstacleNode.yScale = 1
+        
+        //collision Masks
+        obstacleNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
+        obstacleNode.physicsBody?.collisionBitMask = PhysicsCategory.None | PhysicsCategory.Remove
+        obstacleNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
+        obstacleNode.physicsBody?.categoryBitMask = PhysicsCategory.Obstacle
         
         return obstacleNode
         
     }
     
-    /**********************************
+    
+    
+    /****************************************************************************
+     *
      *  RANDOM FLOAT METHODS
-     ***********************************/
+     *
+     *****************************************************************************/
+    
+    
     //returns a random CGFloat
     func random() -> CGFloat {
         return CGFloat(Float(arc4random()) / 0xFFFFFFFF)
@@ -73,56 +123,147 @@ class Obstacle {
     }
     
     
-    /**********************************
-     *  OBSTACLE TYPE METHODS
-     ***********************************/
+    /****************************************************************************
+     *
+     *  LOCATION METHOD
+     *
+     *****************************************************************************/
+    
+    
+    func randomLocation(min: CGFloat, max: CGFloat, scalor: CGFloat) -> CGPoint{
+        
+        let diameter = Int(scalor)
+        
+        // we add on 1/4 of the player scaling factor so the origin can be off to the left or right
+        let randomChuteLocation = Int(random(min: 0, max: playerScalingFactor))
+        
+        var location: CGFloat = 0.0
+        
+        
+        if (diameter % 2 > 0){
+            
+            //odd number of chutes
+            
+            location = (CGFloat((randomChuteLocation - 1)) * playerWidth + playerWidth / 2)
+            
+        }else{
+            
+            location = CGFloat(randomChuteLocation) * playerWidth
+            
+        }
+        
+        let origin = CGPoint(x: location, y: frame.size.height + scalor * playerWidth)
+        
+        
+        return origin
+        
+    }
+    
+    
+    /****************************************************************************
+     *
+     *  SIZE METHOD
+     *
+     *****************************************************************************/
+    
+    func randomScalor(min: CGFloat, max: CGFloat) -> Int {
+        
+        let randomScalor = Int(random(min: min, max: max))
+        return randomScalor
+        
+    }
+    
+    
+    /****************************************************************************
+     *
+     *  OBSTACLE FLAVOR METHODS
+     *
+     *****************************************************************************/
     
     
     //returns an SKShapeNode wormhole obstacle -- blue circle for now
-    func addWormhole(radius: CGFloat) -> SKShapeNode{
+    func addWormhole(origin: CGPoint, scalingFactor: CGFloat) -> SKSpriteNode{
         
-        let wormholeNode = SKShapeNode.init(circleOfRadius: radius)
+        let wormholeNode = SKSpriteNode.init(imageNamed: "Wormhole")
         
-        wormholeNode.physicsBody?.affectedByGravity = true
-        wormholeNode.physicsBody?.isDynamic  = true
-        wormholeNode.zPosition = -4
-        wormholeNode.fillColor = UIColor.blue
+        let radius = (playerWidth / 2) * 3
+//        let origin = CGPoint(x: location, y: self.frame.size.height)
+        
         wormholeNode.name = "wormholeNode"
-        wormholeNode.strokeColor = UIColor.black
+        
+        //Position and Size
+        wormholeNode.position = origin
+        wormholeNode.zPosition = -4
+        
+        wormholeNode.size = CGSize(width: radius * 2, height: radius * 2)
+        
+        wormholeNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - radius / 10)
         
         return wormholeNode
         
     }
     
+    
     //returns an SKShapeNode wormhole obstacle -- yello circle for now
-    func addStar(radius: CGFloat) -> SKShapeNode{
+    func addStar(origin: CGPoint, scalingFactor: CGFloat) -> SKSpriteNode{
         
+        let starNode = SKSpriteNode.init(imageNamed: "star")
         
-        let starNode = SKShapeNode.init(circleOfRadius: radius)
+        let radius = scalingFactor/2 * playerWidth
         
-        starNode.physicsBody?.affectedByGravity = true
-        starNode.physicsBody?.isDynamic  = true
-        starNode.zPosition = -4
-        starNode.fillColor = UIColor.yellow
-        starNode.strokeColor = UIColor.orange
         starNode.name = "starNode"
         
+        //Position and Size
+        starNode.zPosition = -4
+        starNode.position = origin
+        starNode.size = CGSize(width: radius * 2, height: radius * 2)
+        
+        starNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 1)
+
         return starNode
+        
     }
     
     
     //returns an SKShapeNode wormhole obstacle -- black circle for now
-    func addBlackhole(radius: CGFloat) -> SKShapeNode{
+    func addBlackhole(origin: CGPoint, scalingFactor: CGFloat) -> SKSpriteNode{
         
-        let blackholeNode = SKShapeNode(circleOfRadius: radius)
-        blackholeNode.fillColor = UIColor.black
-        blackholeNode.strokeColor = UIColor.gray
-        blackholeNode.physicsBody?.affectedByGravity = true
-        blackholeNode.physicsBody?.isDynamic = true
-        blackholeNode.zPosition = -4
+        let blackholeNode = SKSpriteNode.init(imageNamed: "Blackhole")
+        
+        let radius = scalingFactor/2 * playerWidth
+        
         blackholeNode.name = "blackholeNode"
         
+        //position and size
+        blackholeNode.position = origin
+        blackholeNode.size = CGSize(width: radius * 2, height: radius * 2)
+        blackholeNode.zPosition = -4
+        
+        //Physics Body Setup
+        blackholeNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - radius / 4)
+        
+
         return blackholeNode
+        
+    }
+    
+    func addEngine(origin: CGPoint, scalingFactor: CGFloat) -> SKSpriteNode{
+        
+        let engineNode = SKSpriteNode.init(imageNamed: "Engine")
+        
+        let radius = playerWidth/4
+
+        
+        engineNode.name = "engineNode"
+        
+        //position and size
+        engineNode.position = origin
+        engineNode.size = CGSize(width: radius * 2, height: radius * 2)
+        engineNode.zPosition = -4
+        
+        engineNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 1)
+        
+        return engineNode
     }
     
     
