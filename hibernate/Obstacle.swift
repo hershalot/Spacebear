@@ -34,36 +34,13 @@ class Obstacle {
     
     func addObstacle() -> SKSpriteNode{
         
-        let oTemp = self.random(min:0, max:5)
-        let oRandom = Int(oTemp)
-        
-        //
-//        let eTemp = self.random(min:0, max:9)
-//        let eRandom = Int(eTemp)
-//        
-//        //1 in 9 chance of adding a wormhole engine
-//        if(eRandom == 1 ){
-//            
-//            let scalingFactor: CGFloat = 1.0
-//            
-//            let engineNode = addEngine(origin: randomLocation(min:1, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
-//            engineNode.physicsBody?.isDynamic = true
-//            engineNode.physicsBody?.usesPreciseCollisionDetection = true
-//            engineNode.physicsBody?.affectedByGravity = false
-//            
-//            
-//            //collision Masks
-//            engineNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
-//            engineNode.physicsBody?.collisionBitMask = PhysicsCategory.None | PhysicsCategory.Remove
-//            engineNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
-//            engineNode.physicsBody?.categoryBitMask = PhysicsCategory.Obstacle
-//        
-//        }
+        let temp = self.random(min:0, max:4)
+        let random = Int(temp)
     
         var obstacleNode = SKSpriteNode()
 
 
-        switch oRandom {
+        switch random {
             
             case 0:
                 
@@ -91,7 +68,6 @@ class Obstacle {
         obstacleNode.physicsBody?.isDynamic = true
         obstacleNode.physicsBody?.usesPreciseCollisionDetection = true
         obstacleNode.physicsBody?.affectedByGravity = false
-        obstacleNode.yScale = 1
         
         //collision Masks
         obstacleNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
@@ -159,12 +135,12 @@ class Obstacle {
         
     }
     
-    
     /****************************************************************************
      *
      *  SIZE METHOD
      *
      *****************************************************************************/
+    
     
     func randomScalor(min: CGFloat, max: CGFloat) -> Int {
         
@@ -174,11 +150,13 @@ class Obstacle {
     }
     
     
+    
     /****************************************************************************
      *
      *  OBSTACLE FLAVOR METHODS
      *
      *****************************************************************************/
+    
     
     
     //returns an SKShapeNode wormhole obstacle -- blue circle for now
@@ -187,7 +165,6 @@ class Obstacle {
         let wormholeNode = SKSpriteNode.init(imageNamed: "Wormhole")
         
         let radius = (playerWidth / 2) * 3
-//        let origin = CGPoint(x: location, y: self.frame.size.height)
         
         wormholeNode.name = "wormholeNode"
         
@@ -218,7 +195,7 @@ class Obstacle {
         starNode.position = origin
         starNode.size = CGSize(width: radius * 2, height: radius * 2)
         
-        starNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 1)
+        starNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 4)
 
         return starNode
         
@@ -240,20 +217,22 @@ class Obstacle {
         blackholeNode.zPosition = -4
         
         //Physics Body Setup
-        blackholeNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - radius / 4)
+        blackholeNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - radius / 5)
         
 
         return blackholeNode
         
     }
     
-    func addEngine(origin: CGPoint, scalingFactor: CGFloat) -> SKSpriteNode{
+    func addEngine() -> SKSpriteNode{
         
+        print("Dropping Engine")
         let engineNode = SKSpriteNode.init(imageNamed: "Engine")
         
-        let radius = playerWidth/4
-
+        let origin = randomLocation(min: 0, max: playerScalingFactor, scalor: 2)
         
+        let radius = playerWidth/2
+
         engineNode.name = "engineNode"
         
         //position and size
@@ -261,7 +240,17 @@ class Obstacle {
         engineNode.size = CGSize(width: radius * 2, height: radius * 2)
         engineNode.zPosition = -4
         
-        engineNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 1)
+        engineNode.physicsBody?.isDynamic = true
+        engineNode.physicsBody?.usesPreciseCollisionDetection = true
+        engineNode.physicsBody?.affectedByGravity = false
+        
+        //collision Masks
+        engineNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
+        engineNode.physicsBody?.collisionBitMask = PhysicsCategory.Player |  PhysicsCategory.Remove
+        engineNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
+        engineNode.physicsBody?.categoryBitMask = PhysicsCategory.None
+        
+        engineNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 2)
         
         return engineNode
     }

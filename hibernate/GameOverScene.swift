@@ -103,7 +103,9 @@ class GameOverScene: SKScene {
     
     
     /****************************************************************************
+     *
      *  TOUCH DELEGATE METHODS
+     *
      *****************************************************************************/
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -143,10 +145,13 @@ class GameOverScene: SKScene {
     
     
     
-    /**********************************
-     *  NAVIGATION
-     ***********************************/
-    //will goto the game scene -- used
+    /*********************************
+     *
+     *  SCENE NAVIGATION
+     *
+     **********************************/
+    
+    
     func goToGameScene(){
         
         self.removeAllActions()

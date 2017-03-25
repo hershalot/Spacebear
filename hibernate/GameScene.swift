@@ -53,6 +53,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     var highScoreNode: SKSpriteNode
     var highScoreLbl: SKLabelNode
     
+    var scrollCounter: CGFloat
     
     var scoreNode: SKSpriteNode
     var scoreLbl: SKLabelNode
@@ -65,17 +66,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     //phase shift timers
     var pulseTimer: Timer
     var phaseTimer: Timer
+    var engineTimer: Timer
     
+    
+    //wormhole variables and contstants
     var wormholeEngine: Bool
     var shrinkPlayer: Bool
     var growPlayer: Bool
     var wormholeTraveling: Bool
     let wormholeScalor: CGFloat
     var wormholeTimer: Timer
+    var shrinkWormhole: Bool
     var exitPoint: CGPoint
-    
-    let field: SKFieldNode
+    let wormholeInc: CGFloat
     var collidedWormhole: SKSpriteNode
+    
+    //wormhole radial gravity field
+    let field: SKFieldNode
     
     //swipe recognizers
     var swipeRight:UISwipeGestureRecognizer
@@ -83,9 +90,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     var swipeDown:UISwipeGestureRecognizer
     var swipeUp:UISwipeGestureRecognizer
     
-    let playerScalingFactor: CGFloat
     
-    var animationDictionary: NSMutableDictionary
+    //determines width of player and drop chutes (screenWidth / playerScalingFactor)
+    let playerScalingFactor: CGFloat
     
     override init(size: CGSize) {
         
@@ -123,12 +130,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         phaseTimer = Timer()
         slowPulse = true
         
-
+        
+        //wormhole variables
         collidedWormhole = SKSpriteNode()
         wormholeEngine = false
         shrinkPlayer = false
         growPlayer = false
         wormholeTraveling = false
+        shrinkWormhole = false
+        
+        wormholeInc = 2.0
         wormholeScalor = 45.0
         wormholeTimer = Timer()
         exitPoint = CGPoint()
@@ -136,14 +147,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         field = SKFieldNode.radialGravityField()
         
         
-        //normal speed
+        //timer for frequency of engine drop
+        engineTimer = Timer()
+        
+        //default speed
         flightSpeed = 9.0
-        animationDictionary = NSMutableDictionary()
         
-        
+        //keeps track of the background scrolling
+        scrollCounter = 0.0
         
         super.init(size: size)
-        
         
     }
     
@@ -163,8 +176,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         cruisingHeight = self.size.height / 5
         
         self.addPlayer(atPosition: CGPoint(x: size.width/2, y: cruisingHeight + self.player.size.height), withSize: CGSize(width: (self.size.width / playerScalingFactor), height: (self.size.height / playerScalingFactor)))
-        
-//        self.physicsBody = SKPhysicsBody(edgeFrom: CGPoint(x: 0 , y: cruisingHeight), to: CGPoint(x: self.size.width, y: cruisingHeight))
+
         
         self.physicsBody = SKPhysicsBody(edgeLoopFrom: CGRect(x: 0, y: cruisingHeight, width: self.size.width, height: self.size.height - cruisingHeight))
         
@@ -188,16 +200,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         //setup highscore and current score label nodes
         self.addScoreNodes()
 
-
     }
     
     
-    /***********************************************************************
+    /*******************************************************
      *
      * ADDING SETUP GAME NODES
      *
-     ***********************************************************************/
-    
+     *******************************************************/
+
     
     func addBackground(){
         
@@ -276,7 +287,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         
-        
         if(wormholeTraveling){
             
             obstacle.size = CGSize(width: obstacle.size.width, height: obstacle.size.height * 2)
@@ -284,13 +294,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             if(!wormholeEngine){
                 
                 obstacle.position = CGPoint(x: obstacle.position.x, y: -(obstacle.position.y - self.size.height))
-                obstacle.physicsBody?.velocity = CGVector(dx: 0,dy: -flightSpeed * wormholeScalor)
+                
             }
+            obstacle.physicsBody?.velocity = CGVector(dx: 0,dy: -flightSpeed * wormholeScalor*2)
         }
         
         addChild(obstacle)
 
-        
     }
     
     
@@ -310,6 +320,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         removeObstacleNodeBottom.physicsBody?.categoryBitMask = PhysicsCategory.Remove
         removeObstacleNodeBottom.physicsBody?.collisionBitMask = PhysicsCategory.Obstacle
         removeObstacleNodeBottom.physicsBody?.contactTestBitMask = PhysicsCategory.Obstacle
+        
         addChild(removeObstacleNodeBottom)
 
         
@@ -321,6 +332,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         removeObstacleNodeTop.physicsBody?.categoryBitMask = PhysicsCategory.Remove
         removeObstacleNodeTop.physicsBody?.collisionBitMask = PhysicsCategory.Obstacle
         removeObstacleNodeTop.physicsBody?.contactTestBitMask = PhysicsCategory.Obstacle
+        
         addChild(removeObstacleNodeTop)
         
     }
@@ -530,13 +542,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             (secondBody.categoryBitMask & PhysicsCategory.Player != 0)) {
             if  let player = secondBody.node as? SKSpriteNode, let ball = firstBody.node as? SKSpriteNode {
                 
-                playerDidCollideWithObstacle(player: player, ball: ball)
+                playerDidCollideWithObstacle(player: player, obstacle: ball)
                 
             }
         }
             
-//        //Removal Collision
-        if ((firstBody.categoryBitMask & PhysicsCategory.Remove != 0) &&
+       //Removal Collision
+       if ((firstBody.categoryBitMask & PhysicsCategory.Remove != 0) &&
             (secondBody.categoryBitMask & PhysicsCategory.Obstacle != 0)) {
             if let obstacle = firstBody.node as? SKSpriteNode, let removal = secondBody.node as? SKSpriteNode{
                 
@@ -564,35 +576,39 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
 
-    func playerDidCollideWithObstacle(player: SKSpriteNode, ball: SKSpriteNode) {
+    func playerDidCollideWithObstacle(player: SKSpriteNode, obstacle: SKSpriteNode) {
         
         
-        if(ball.name == "wormholeNode"){
+        if(obstacle.name == "wormholeNode"){
             
             print("Collision with Wormhole")
             
-            self.collidedWormhole = ball
+            self.collidedWormhole = obstacle
             
             //slow down the player on wormhole collision or sometimes the bounce is wild
-            player.physicsBody?.velocity = CGVector(dx: (player.physicsBody?.velocity.dx)! * 0.1, dy:(player.physicsBody?.velocity.dy)! * 0.1)
+            player.physicsBody?.velocity = CGVector(dx: (player.physicsBody?.velocity.dx)! * 0.01, dy:(player.physicsBody?.velocity.dy)! * 0.01)
+            
+            
             self.wormholeEntered()
             
             
-        }else if (ball.name == "blackholeNode"){
+        }else if (obstacle.name == "blackholeNode"){
             
             print("Collision with Black Hole")
-            
+            hitBlackholeAnimationSetup(position: obstacle.position)
             self.gameOver()
             
-        }else if(ball.name == "starNode"){
+        }else if(obstacle.name == "starNode"){
             
             print("Collision with Star")
             
             self.gameOver()
             
-        }else if (ball.name == "engineNode"){
+        }else if (obstacle.name == "engineNode"){
             
-            self.wormholeEngineAcquired()
+            print("Collision with Engine")
+            wormholeEngineAcquired()
+            obstacle.removeFromParent()
             
         }
     }
@@ -609,6 +625,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             self.moveBackground = true
             
             startAddingObstacles()
+            startDroppingEngines()
+            
             
             self.swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(self.swipedRight))
             self.swipeRight.direction = .right
@@ -637,6 +655,28 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
      *
      *****************************************************************************/
     
+    
+    func startDroppingEngines(){
+        
+        engineTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(6.0), repeats: true) { timer in
+            // Add your code here
+            
+            let o = Obstacle(frame: self.frame)
+            let engine = o.addEngine()
+            
+            self.addChild(engine)
+            
+        }
+        
+    }
+    
+    func stopDroppingEngines(){
+        
+        engineTimer.invalidate()
+        
+    }
+    
+    
     func startAddingObstacles(){
         
         
@@ -644,7 +684,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             SKAction.sequence([
                 SKAction.run(self.configureAndAddObstacle),
                 //adjust ,min/max to increase /decrease frequency of obstacle drop
-                SKAction.wait(forDuration: TimeInterval(self.random(min: 0.45, max: 0.6)))
+                SKAction.wait(forDuration: TimeInterval(self.random(min: 0.5, max: 0.7)))
                 ])
         ), withKey: "drop")
     
@@ -660,7 +700,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     
-    func pushCurrentObstacles(){
+    func pushCurrentObstacles(scalor: CGFloat){
         
         for child in self.children{
             
@@ -669,7 +709,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 child.physicsBody?.isDynamic = true
                 child.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
                 child.physicsBody?.affectedByGravity = false
-                child.physicsBody?.velocity = CGVector(dx: 0, dy: -flightSpeed * wormholeScalor)
+                child.physicsBody?.velocity = CGVector(dx: 0, dy: -flightSpeed * wormholeScalor * scalor)
                 
             }
         }
@@ -712,6 +752,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 
                 
                 
+                
             }
         }
     }
@@ -748,44 +789,61 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     func wormholeEntered(){
         
-        self.collidedWormhole.name = "collidedWormhole"
-
+        collidedWormhole.name = "collidedWormhole"
+        let wormholeYVelocity:CGFloat = 20
         
-        self.moveBackground = false
-        self.stopAddingObstacles()
-        self.stopAllObstacles()
+        moveBackground = false
         
-        self.collidedWormhole.physicsBody?.categoryBitMask = PhysicsCategory.None
-        self.collidedWormhole.physicsBody?.collisionBitMask = PhysicsCategory.None
-        self.collidedWormhole.physicsBody?.contactTestBitMask = PhysicsCategory.None
+        stopAddingObstacles()
+        stopAllObstacles()
+        stopDroppingEngines()
         
-        self.collidedWormhole.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
-        self.physicsWorld.gravity = CGVector(dx: 0, dy: 0)
+        collidedWormhole.physicsBody?.categoryBitMask = PhysicsCategory.None
+        collidedWormhole.physicsBody?.collisionBitMask = PhysicsCategory.None
+        collidedWormhole.physicsBody?.contactTestBitMask = PhysicsCategory.None
+        
+        collidedWormhole.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+        physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         player.physicsBody?.affectedByGravity = true
         
         if(wormholeEngine){
             
-            self.flightSpeed = 20
+            flightSpeed = wormholeYVelocity
             
         }else{
 
-            self.flightSpeed = -20
+            flightSpeed = -wormholeYVelocity
         }
-        self.exitPoint = player.position
-        enterWormholeAnimation(position: self.collidedWormhole.position)
+        
+        exitPoint = player.position
+        enterWormholeAnimationSetup(position: self.collidedWormhole.position)
     }
 
     
-    func wormholeTravel(){
+    func startWormholeTravel(){
         
         wormholeTraveling = true
-        pushCurrentObstacles()
+        pushCurrentObstacles(scalor: 2)
         startAddingObstacles()
         moveBackground = true
         
-        wormholeTimer = Timer.scheduledTimer(timeInterval: 7.0, target: self, selector: #selector(exitWormhole), userInfo: nil, repeats: false)
+        wormholeTimer = Timer.scheduledTimer(timeInterval: 4.0, target: self, selector: #selector(exitWormhole), userInfo: nil, repeats: false)
+        
+    }
+    
+    func wormholeExited(){
         
         
+        wormholeEngine = false
+        wormholeTraveling = false
+        moveBackground = true
+        flightSpeed = 9.0
+        
+        player.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: player.size.width - 4, height: player.size.height - 4))
+        
+        pushCurrentObstacles(scalor: 1)
+        startAddingObstacles()
+        startDroppingEngines()
     }
     
     
@@ -799,7 +857,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         moveBackground = false
         wormholeTraveling = false
         
-        exitWormholeAnimation()
+        exitWormholeAnimationSetup()
         
     }
     
@@ -811,24 +869,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
      ***************************************************/
     
     
-    func enterWormholeAnimation(position: CGPoint){
+    func enterWormholeAnimationSetup(position: CGPoint){
         
-        player.physicsBody?.allowsRotation = true
-//        player.physicsBody?.applyAngularImpulse(0.1)
         shrinkPlayer = true
         
         field.position = position
         field.falloff = -1
         field.smoothness = 4
-//        field.strength = 4
-        field.animationSpeed = 40
+        field.strength = 15
+//        field.animationSpeed = 40
         
         addChild(field)
     
     }
     
     
-    func exitWormholeAnimation(){
+    func exitWormholeAnimationSetup(){
         
         growPlayer = true
         
@@ -840,6 +896,28 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         addChild(collidedWormhole)
 
+    }
+    
+    
+    /**************************************************
+     *
+     * BLACKHOLE ANIMATION
+     *
+     ***************************************************/
+    
+    
+    func hitBlackholeAnimationSetup(position: CGPoint){
+
+        shrinkPlayer = true
+        
+        field.position = position
+        field.falloff = -1
+        field.smoothness = 4
+        field.strength = 40
+//        field.animationSpeed = 40
+        
+        addChild(field)
+        
     }
     
     
@@ -952,29 +1030,60 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
      *
      *****************************************************************************/
     
+    
+    
     override func update(_ currentTime: TimeInterval) {
         
-        scoreLbl.text = "Score: " + String(describing: self.score)
         
-        //basic scoring, should be refined
-        if ((background1.position.y <= -background1.size.height/3 || background2.position.y <= -background1.size.height/3) && moveBackground){
-            
-            score += 1
+        /************************************
+         *
+         * SCORE KEEPING
+         *
+         * Add scoreNumber to score
+         *
+         ************************************/
+        
+        var scoreNumber: Int = 1
+        
+        if(wormholeTraveling && !wormholeEngine){
+                
+            scoreNumber = -1
             
         }
+        let scoreDistance = abs(scrollCounter - background1.position.y)
+        
+        
+        
+        if (scoreDistance > self.size.height / (playerScalingFactor / 2)){
+            
+            scrollCounter = background1.position.y
+            updateScore(scoreNumber: scoreNumber)
+            scoreLbl.text = "Score: " + String(describing: self.score)
+        }
+        
+        
+        
+        
+        
+        /***********************
+         *
+         * WORMHOLE ANIMATIONS
+         *
+         ***********************/
+        
         
         if(shrinkPlayer){
             
             if(player.size.height > self.size.height / 45  && player.size.width > self.size.width / 45){
                 
-                player.size = CGSize(width: player.size.width - 0.3 ,height: player.size.height - 0.6)
+                player.size = CGSize(width: player.size.width - 0.6 ,height: player.size.height - 1.0)
 
                 
             }else{
                 
                 if (collidedWormhole.size.height > self.size.height / 45  && collidedWormhole.size.width > self.size.width / 45){
                     
-                    collidedWormhole.size = CGSize(width: collidedWormhole.size.width - 0.8 ,height: collidedWormhole.size.height - 0.8)
+                    collidedWormhole.size = CGSize(width: collidedWormhole.size.width - wormholeInc ,height: collidedWormhole.size.height - wormholeInc)
                     
                 }else{
                     
@@ -983,8 +1092,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                     field.removeFromParent()
                     
                     shrinkPlayer = false
-                    
-                    wormholeTravel()
+                    startWormholeTravel()
                     
                 }
             }
@@ -994,41 +1102,55 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if(growPlayer){
             
             
-            if (collidedWormhole.size.width < (self.size.width / playerScalingFactor )*3) {
+            if (collidedWormhole.size.width < (self.size.width / playerScalingFactor ) * 3) {
                 
-                collidedWormhole.size = CGSize(width: collidedWormhole.size.width + 0.8 ,height: collidedWormhole.size.height + 0.8)
+                collidedWormhole.size = CGSize(width: collidedWormhole.size.width + wormholeInc ,height: collidedWormhole.size.height + wormholeInc)
                 
             }else{
                 
                 if(player.size.height < self.size.height / playerScalingFactor  && player.size.width < self.size.width / playerScalingFactor){
                 
-                    player.size = CGSize(width: player.size.width + 0.25 ,height: player.size.height + 0.5)
+                    player.size = CGSize(width: player.size.width + 0.5, height: player.size.height + 1.0)
                 
                 }else{
                 
-                    if (collidedWormhole.size.width > (player.size.width) / 55) {
-                        
-                        print(collidedWormhole.size.width)
-                        // it's getting here but the wormhole won't shrink again ?? WHYYYYYYY
-                        
-                        collidedWormhole.size = CGSize(width: collidedWormhole.size.width - 0.5 ,height: collidedWormhole.size.height - 0.5)
-
-                        print(collidedWormhole.size.width)
-                        
-                    }else{
-                        
-                        player.size = CGSize()
-                        collidedWormhole.removeFromParent()
-                        growPlayer = false
-                        
-                    }
+                    player.size = CGSize(width: (self.size.width / playerScalingFactor), height: (self.size.height / playerScalingFactor))
+                    
+                    growPlayer = false
+                    shrinkWormhole = true
+                
                 }
                 
             }
         }
         
         
-        //move the background for the flying effect
+        if(shrinkWormhole){
+            
+            if (collidedWormhole.size.width > (player.size.width) / 45) {
+                
+                collidedWormhole.size = CGSize(width: collidedWormhole.size.width - wormholeInc ,height: collidedWormhole.size.height - wormholeInc)
+                
+            }else{
+                
+                collidedWormhole.removeFromParent()
+                shrinkWormhole = false
+                
+                wormholeExited()
+                
+            }
+        }
+        
+        
+        /******************************************
+         *
+         * BACKGROUND CONTROL
+         *
+         * move the background for the flying effect
+         *
+         ******************************************/
+        
+        
         if moveBackground {
             
             if (wormholeEngine || !wormholeTraveling){
@@ -1038,12 +1160,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             
                 if(background1.position.y < -background1.size.height){
                     
-                    background1.position = CGPoint(x:background2.position.x, y:background1.position.y + 2*self.size.height )
+                    background1.position = CGPoint(x:background2.position.x, y:background1.position.y + 2*self.size.height)
+                    scrollCounter = background1.position.y
+
                 }
             
                 if(background2.position.y < -background2.size.height){
                     
                     background2.position = CGPoint(x:background1.position.x, y:background2.position.y + 2*self.size.height)
+
                 
                 }
                 
@@ -1055,21 +1180,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 if(background1.position.y > background1.size.height){
                     
                     background1.position = CGPoint(x:background2.position.x, y:(background1.position.y - background1.size.height) - self.size.height)
+                    scrollCounter = background1.position.y
                     
                 }
                     
                 if(background2.position.y > background2.size.height){
                         
                     background2.position = CGPoint(x:background1.position.x, y: (background2.position.y - background2.size.height) - self.size.height)
-                    
-                    
+
                 }
             }
-        
         }
-        
-        
     }
+    
+    
+    
     
     
     /***********************************
@@ -1092,26 +1217,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
     
     
+    
+    
     /****************************************************************************
      *
      *  ENDGAME, NAVIGATION AND SCORE METHODS
      *
      *****************************************************************************/
     
-    //will goto the game over scene
-    func goToGameOverScene(){
-        
-        let defaults = UserDefaults.standard
-    
-        defaults.set(self.score, forKey: "score")
-        defaults.synchronize()
-        
-        let gameOverScene:GameOverScene = GameOverScene(size: self.size) // create your new scene
-        let transition = SKTransition.fade(withDuration: 2.0) // create type of transition (you can check in documentation for more transtions)
-        gameOverScene.scaleMode = SKSceneScaleMode.fill
-        self.view!.presentScene(gameOverScene, transition: transition)
-        
-    }
+
     
     
     override func willMove(from view: SKView) {
@@ -1125,12 +1239,44 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     
+    func updateScore(scoreNumber: Int){
+        
+        self.score = score + scoreNumber
+        
+        
+    }
+    
+    
+    
     //GAME OVER
     
     func gameOver(){
         
+        stopAllObstacles()
+        stopAddingObstacles()
+        engineTimer.invalidate()
+        
         self.moveBackground = false
+        
         self.goToGameOverScene()
+        
+    }
+    
+    //will goto the game over scene
+    func goToGameOverScene(){
+        
+        let defaults = UserDefaults.standard
+        
+        defaults.set(self.score, forKey: "score")
+        
+        defaults.synchronize()
+        
+        let gameOverScene:GameOverScene = GameOverScene(size: self.size) // create your new scene
+        let transition = SKTransition.fade(withDuration: 2.0) // create type of transition (you can check in documentation for more transtions)
+        
+        gameOverScene.scaleMode = SKSceneScaleMode.fill
+        self.view!.presentScene(gameOverScene, transition: transition)
+        
         
     }
     
