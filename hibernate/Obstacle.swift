@@ -28,13 +28,14 @@ class Obstacle {
     
     /****************************************************************************
      *
-     *  OBSTACAL CHOOSING METHOD
+     * _______________________ OBSTACAL CHOOSING METHOD _________________________
+     *
      *
      *****************************************************************************/
     
     func addObstacle() -> SKSpriteNode{
         
-        let temp = self.random(min:0, max:4)
+        let temp = self.random(min:0, max:6)
         let random = Int(temp)
     
         var obstacleNode = SKSpriteNode()
@@ -46,22 +47,31 @@ class Obstacle {
                 
                 let scalingFactor: CGFloat = 3.0
                 
-                obstacleNode = addWormhole(origin: randomLocation(min:0, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
+                obstacleNode = addWormhole(origin: randomLocation(min:2, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
             
             case 1 :
             
                 
-                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 3, max: playerScalingFactor/1.2 ))
+                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 3, max: playerScalingFactor/2 ))
                 
                 obstacleNode = addBlackhole(origin: randomLocation(min:0, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
+            case 2:
             
+                obstacleNode = addEngine()
+            
+            case 3:
+            
+            
+                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 3, max: playerScalingFactor/2 ))
+            
+                obstacleNode = addBlackhole(origin: randomLocation(min:0, max: playerScalingFactor, scalor: scalingFactor), scalingFactor: scalingFactor)
             
             default:
                 
                 print("Default Obstacle Case - Star")
-                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 2, max: playerScalingFactor/2))
+                let scalingFactor: CGFloat = CGFloat(randomScalor(min: 2, max: playerScalingFactor/3))
                 
-                obstacleNode = addStar(origin: randomLocation(min:2, max: playerScalingFactor/2, scalor: scalingFactor), scalingFactor: scalingFactor)
+                obstacleNode = addStar(origin: randomLocation(min:0, max: playerScalingFactor/2, scalor: scalingFactor), scalingFactor: scalingFactor)
             
         }
         
@@ -70,10 +80,10 @@ class Obstacle {
         obstacleNode.physicsBody?.affectedByGravity = false
         
         //collision Masks
-        obstacleNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
-        obstacleNode.physicsBody?.collisionBitMask = PhysicsCategory.None | PhysicsCategory.Remove
-        obstacleNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
         obstacleNode.physicsBody?.categoryBitMask = PhysicsCategory.Obstacle
+        obstacleNode.physicsBody?.contactTestBitMask = PhysicsCategory.None
+        obstacleNode.physicsBody?.collisionBitMask = PhysicsCategory.None
+        obstacleNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
         
         return obstacleNode
         
@@ -81,9 +91,9 @@ class Obstacle {
     
     
     
-    /****************************************************************************
+    /*****************************************************************************
      *
-     *  RANDOM FLOAT METHODS
+     * __________________________ RANDOM FLOAT METHODS __________________________
      *
      *****************************************************************************/
     
@@ -99,9 +109,9 @@ class Obstacle {
     }
     
     
-    /****************************************************************************
+    /*****************************************************************************
      *
-     *  LOCATION METHOD
+     * _________________________ RANDOM LOCATION METHOD __________________________
      *
      *****************************************************************************/
     
@@ -137,7 +147,7 @@ class Obstacle {
     
     /****************************************************************************
      *
-     *  SIZE METHOD
+     * __________________________ RANDOM SIZE METHOD ___________________________
      *
      *****************************************************************************/
     
@@ -153,7 +163,7 @@ class Obstacle {
     
     /****************************************************************************
      *
-     *  OBSTACLE FLAVOR METHODS
+     * ________________________ OBSTACLE FLAVOR METHODS __________________________
      *
      *****************************************************************************/
     
@@ -217,7 +227,7 @@ class Obstacle {
         blackholeNode.zPosition = -4
         
         //Physics Body Setup
-        blackholeNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - radius / 5)
+        blackholeNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - radius / 4)
         
 
         return blackholeNode
@@ -231,7 +241,7 @@ class Obstacle {
         
         let origin = randomLocation(min: 0, max: playerScalingFactor, scalor: 2)
         
-        let radius = playerWidth/2
+        let radius = 3*playerWidth/4
 
         engineNode.name = "engineNode"
         
@@ -239,16 +249,6 @@ class Obstacle {
         engineNode.position = origin
         engineNode.size = CGSize(width: radius * 2, height: radius * 2)
         engineNode.zPosition = -4
-        
-        engineNode.physicsBody?.isDynamic = true
-        engineNode.physicsBody?.usesPreciseCollisionDetection = true
-        engineNode.physicsBody?.affectedByGravity = false
-        
-        //collision Masks
-        engineNode.physicsBody?.contactTestBitMask = PhysicsCategory.Player | PhysicsCategory.Remove
-        engineNode.physicsBody?.collisionBitMask = PhysicsCategory.Player |  PhysicsCategory.Remove
-        engineNode.physicsBody?.velocity = CGVector(dx: 0, dy:-600)
-        engineNode.physicsBody?.categoryBitMask = PhysicsCategory.None
         
         engineNode.physicsBody = SKPhysicsBody(circleOfRadius: radius - 2)
         

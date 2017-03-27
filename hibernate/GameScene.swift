@@ -16,10 +16,10 @@ struct PhysicsCategory {
     
     static let None      : UInt32 = 0
     static let All       : UInt32 = UInt32.max
-    static let Remove    : UInt32 = 0b1
-    static let Floor     : UInt32 = 0b10
-    static let Obstacle  : UInt32 = 0b11
-    static let Player    : UInt32 = 0b100
+    static let Remove    : UInt32 = 0b001
+    static let Frame     : UInt32 = 0b010 // 2
+    static let Obstacle  : UInt32 = 0b101 // 5
+    static let Player    : UInt32 = 0b110 // 6
     
 }
 
@@ -28,7 +28,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
 
     //bear sprite
-    let player: SKSpriteNode = SKSpriteNode(imageNamed: "Woolybear")
+    var player: SKSpriteNode = SKSpriteNode()
     
     //backgrounds for making the apearance of movement
     let background1 = SKSpriteNode(imageNamed: "NightSky")
@@ -79,10 +79,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     var shrinkWormhole: Bool
     var exitPoint: CGPoint
     let wormholeInc: CGFloat
-    var collidedWormhole: SKSpriteNode
+    var collidedObstacle: SKSpriteNode
+    var hasWormholeEngine: SKSpriteNode
+    
+    var hitBlackhole: Bool
+//    var collidedBlackhole: SKSpriteNode
     
     //wormhole radial gravity field
-    let field: SKFieldNode
+    var field: SKFieldNode
+    
     
     //swipe recognizers
     var swipeRight:UISwipeGestureRecognizer
@@ -106,7 +111,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         //phase shift variables
         phaseShift = false
         phaseDuration = 10.0
-        
         phaseRecharge = 15.0
         
         //Scoring
@@ -125,6 +129,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         swipeLeft = UISwipeGestureRecognizer.init()
         swipeRight = UISwipeGestureRecognizer.init()
         
+        
         //Phase Shift Variables
         pulseTimer  = Timer()
         phaseTimer = Timer()
@@ -132,7 +137,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         
         //wormhole variables
-        collidedWormhole = SKSpriteNode()
+        collidedObstacle = SKSpriteNode()
         wormholeEngine = false
         shrinkPlayer = false
         growPlayer = false
@@ -143,6 +148,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         wormholeScalor = 45.0
         wormholeTimer = Timer()
         exitPoint = CGPoint()
+        hasWormholeEngine = SKSpriteNode()
+        
+        hitBlackhole = false
+//        collidedBlackhole = SKSpriteNode()
         
         field = SKFieldNode.radialGravityField()
         
@@ -155,6 +164,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         //keeps track of the background scrolling
         scrollCounter = 0.0
+    
         
         super.init(size: size)
         
@@ -173,7 +183,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         print("Did Move to GameScene View")
         
-        cruisingHeight = self.size.height / 5
+        cruisingHeight = self.size.height / 7
         
         self.addPlayer(atPosition: CGPoint(x: size.width/2, y: cruisingHeight + self.player.size.height), withSize: CGSize(width: (self.size.width / playerScalingFactor), height: (self.size.height / playerScalingFactor)))
 
@@ -181,9 +191,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         self.physicsBody = SKPhysicsBody(edgeLoopFrom: CGRect(x: 0, y: cruisingHeight, width: self.size.width, height: self.size.height - cruisingHeight))
         
         self.physicsBody?.isDynamic = false
-        self.physicsBody?.categoryBitMask = PhysicsCategory.Floor
+        self.physicsBody?.categoryBitMask = PhysicsCategory.Frame
         self.physicsBody?.contactTestBitMask = PhysicsCategory.Player
-        self.physicsBody?.collisionBitMask = PhysicsCategory.Player
         
         self.physicsBody?.usesPreciseCollisionDetection = true
         
@@ -199,16 +208,28 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         //setup highscore and current score label nodes
         self.addScoreNodes()
+        
 
     }
     
     
     /*******************************************************
      *
-     * ADDING SETUP GAME NODES
+     * _______________ADDING SETUP GAME NODES_______________
      *
      *******************************************************/
 
+    func addEngineImage(){
+        
+        hasWormholeEngine = SKSpriteNode(imageNamed: "Engine")
+        hasWormholeEngine.size = CGSize(width:self.size.width/12, height: self.size.width/12)
+        hasWormholeEngine.position = CGPoint(x:self.size.width/2, y:20)
+        hasWormholeEngine.zPosition = -4.0;
+        hasWormholeEngine.physicsBody?.isDynamic = false
+        
+        addChild(hasWormholeEngine)
+        
+    }
     
     func addBackground(){
         
@@ -217,14 +238,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         background1.anchorPoint = CGPoint.zero;
         background1.position = CGPoint(x:0, y:0)
         background1.zPosition = -5.0;
-        addChild(background1)
-        
         
         background2.name = "background"
         background2.size = CGSize(width:self.size.width + 10, height: self.size.height + 20)
         background2.anchorPoint = CGPoint.zero;
         background2.position = CGPoint(x:0, y:background2.size.height - 1)
         background2.zPosition = -5.0;
+        
+        
+        addChild(background1)
         addChild(background2)
         
     }
@@ -233,17 +255,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     func addPlayer(atPosition: CGPoint, withSize: CGSize){
         
+        player = SKSpriteNode(imageNamed: "Woolybear")
         player.name = "player"
-        
         player.size = withSize
         player.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: player.size.width - 4, height: player.size.height - 4))
-
         player.physicsBody?.isDynamic = true
-        
         player.physicsBody?.categoryBitMask = PhysicsCategory.Player
-        player.physicsBody?.contactTestBitMask =  PhysicsCategory.Floor
-        player.physicsBody?.collisionBitMask = PhysicsCategory.Floor
-        
+        player.physicsBody?.contactTestBitMask =  PhysicsCategory.Obstacle | PhysicsCategory.Frame
         player.physicsBody?.usesPreciseCollisionDetection = true
         player.position = atPosition
         player.physicsBody?.allowsRotation = false
@@ -273,15 +291,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let obstacle = o.addObstacle()
         
         
-        //each obstacle type gets it's own random sizing framework
-        if obstacle.name! == "starNode" {
-            
-            //the radius shouldn't be more than 1/4 the width of the screen. Cast it to an integer to easily identify chute
-            if(self.phaseShift){
-                    
+
+        //the radius shouldn't be more than 1/4 the width of the screen. Cast it to an integer to easily identify chute
+        if(phaseShift){
+            if obstacle.name! == "starNode" {
+                
                 obstacle.physicsBody?.categoryBitMask = PhysicsCategory.None
-                obstacle.physicsBody?.contactTestBitMask = PhysicsCategory.None | PhysicsCategory.Remove
-                obstacle.physicsBody?.collisionBitMask = PhysicsCategory.None | PhysicsCategory.Remove
                 
             }
         }
@@ -310,39 +325,43 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let removeObstacleNodeBottom = SKSpriteNode()
         let removeObstacleNodeTop = SKSpriteNode()
         
-        let size = CGSize(width: 3 * self.size.width, height: 20)
+        let size = CGSize(width: 3*self.size.width, height: 20)
         
         removeObstacleNodeBottom.size = size
         removeObstacleNodeBottom.position = CGPoint(x:-self.size.width ,y: -self.size.height)
-        removeObstacleNodeBottom.name = "removalNode"
-        removeObstacleNodeBottom.physicsBody?.isDynamic = false
-
+        removeObstacleNodeBottom.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: size.width, height: size.height))
+        removeObstacleNodeBottom.name = "removalNodeBottom"
+        removeObstacleNodeBottom.physicsBody?.isDynamic = true
+        removeObstacleNodeBottom.physicsBody?.affectedByGravity = false
+        removeObstacleNodeBottom.physicsBody?.pinned = true
         removeObstacleNodeBottom.physicsBody?.categoryBitMask = PhysicsCategory.Remove
-        removeObstacleNodeBottom.physicsBody?.collisionBitMask = PhysicsCategory.Obstacle
         removeObstacleNodeBottom.physicsBody?.contactTestBitMask = PhysicsCategory.Obstacle
+        removeObstacleNodeBottom.physicsBody?.allowsRotation = false
         
         addChild(removeObstacleNodeBottom)
 
         
         removeObstacleNodeTop.size = size
         removeObstacleNodeTop.position = CGPoint(x:-self.size.width ,y: 2*self.size.height)
-        removeObstacleNodeTop.name = "removalNode"
-        removeObstacleNodeTop.physicsBody?.isDynamic = false
-        
+        removeObstacleNodeTop.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: size.width, height: size.height))
+        removeObstacleNodeTop.name = "removalNodeTop"
+        removeObstacleNodeTop.physicsBody?.isDynamic = true
+        removeObstacleNodeTop.physicsBody?.affectedByGravity = false
+        removeObstacleNodeTop.physicsBody?.pinned = true
         removeObstacleNodeTop.physicsBody?.categoryBitMask = PhysicsCategory.Remove
-        removeObstacleNodeTop.physicsBody?.collisionBitMask = PhysicsCategory.Obstacle
         removeObstacleNodeTop.physicsBody?.contactTestBitMask = PhysicsCategory.Obstacle
+        removeObstacleNodeTop.physicsBody?.allowsRotation = false
         
         addChild(removeObstacleNodeTop)
         
     }
     
+    
     /*************************************************************
      *
-     * SCORING LABELS
+     * ______________________ SCORING LABELS _____________________
      *
-     ************************************************************/
-    
+     *************************************************************/
     
     
     func addScoreNodes(){
@@ -382,7 +401,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /****************************************************************************
      *
-     *  SWIPE SELECTOR METHODS
+     *  __________________________SWIPE SELECTOR METHODS________________________
      *
      *****************************************************************************/
     
@@ -409,6 +428,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         player.physicsBody?.velocity = CGVector(dx:0,dy:0)
+        
         player.run(jumpRight)
         
     }
@@ -436,6 +456,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         player.physicsBody?.velocity = CGVector(dx:0,dy:0)
+        
         player.run(jumpLeft)
         
     }
@@ -445,17 +466,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
      func swipedUp(){
         
         //call this on initial Swipe up
+        self.moveBackground = true
+        
+        
         if(startSwipe){
             
-            self.player.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 80));
             
+            self.player.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 80));
             self.physicsWorld.gravity = CGVector.init(dx: 0, dy: -9.8)
+            
             
         }
         
-        if(!phaseShift && moveBackground && !wormholeTraveling){
+        if(!phaseShift && !startSwipe && !wormholeTraveling){
             
-            self.player.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 50));
+            self.player.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 30));
             self.startPhaseShift()
         }
     }
@@ -473,11 +498,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
 
-    /*************************************************************************************
+    /******************************************************************************
     *
-    * TOUCH DELEGATE METHODS
+    * __________________________ TOUCH DELEGATE METHODS ___________________________
     *
-    **************************************************************************************/
+    ********************************************************************************/
+    
  
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -497,9 +523,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     
-    /****************************************************************************
+    /*****************************************************************************
      *
-     *  PHYSICS COLLISION METHODS
+     * _________________________PHYSICS COLLISION METHODS________________________
      *
      *****************************************************************************/
     
@@ -507,12 +533,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     func didBegin(_ contact: SKPhysicsContact) {
         
-        let contactPoint = contact.contactPoint
-        
-        print(contactPoint)
         
         var firstBody: SKPhysicsBody
         var secondBody: SKPhysicsBody
+        
         if contact.bodyA.categoryBitMask < contact.bodyB.categoryBitMask {
             
             firstBody = contact.bodyA
@@ -524,47 +548,58 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             secondBody = contact.bodyA
             
         }
-
-        
-        //Wall collision
-        if ((firstBody.categoryBitMask & PhysicsCategory.Floor != 0) &&
-            (secondBody.categoryBitMask & PhysicsCategory.Player != 0)) {
-            if  (secondBody.node as? SKSpriteNode != nil) {
-                
-                playerDidCollideWithCruisingHeight()
-                
-            }
-        }
         
         
-        //Star Collision
-        if ((firstBody.categoryBitMask & PhysicsCategory.Obstacle != 0) &&
-            (secondBody.categoryBitMask & PhysicsCategory.Player != 0)) {
-            if  let player = secondBody.node as? SKSpriteNode, let ball = firstBody.node as? SKSpriteNode {
-                
-                playerDidCollideWithObstacle(player: player, obstacle: ball)
-                
-            }
-        }
+        if(firstBody.categoryBitMask == PhysicsCategory.Frame && secondBody.categoryBitMask == PhysicsCategory.Player){
             
-       //Removal Collision
-       if ((firstBody.categoryBitMask & PhysicsCategory.Remove != 0) &&
-            (secondBody.categoryBitMask & PhysicsCategory.Obstacle != 0)) {
-            if let obstacle = firstBody.node as? SKSpriteNode, let removal = secondBody.node as? SKSpriteNode{
+            if secondBody.node as? SKSpriteNode != nil {
                 
+                print("Floor Collision")
+                playerDidCollideWithFloor()
+                
+            }
+        }
+    
+        
+        if(firstBody.categoryBitMask == PhysicsCategory.Obstacle && secondBody.categoryBitMask == PhysicsCategory.Player){
+            
+            if  let player = secondBody.node as? SKSpriteNode, let obstacle = firstBody.node as? SKSpriteNode {
+                
+                print("Obstacle Collision")
+                playerDidCollideWithObstacle(player: player, obstacle: obstacle)
+                
+            }
+        }
+        
+          
+            
+        if(firstBody.categoryBitMask == PhysicsCategory.Remove && secondBody.categoryBitMask == PhysicsCategory.Obstacle){
+            
+            if let obstacle = secondBody.node as? SKSpriteNode, let removal = firstBody.node as? SKSpriteNode{
+                
+                print("Removal Collision")
                 obstacleDidCollideWithRemovalNode(obstacle: obstacle, removalWall: removal)
                 
             }
+            
+            
         }
+       
         
     }
 
     
-    /****************************************************************************
+    /*****************************************************************************************************
      *
-     *  COLLISION ACTION METHODS
+     *  _____________________________________COLLISION ACTION METHODS____________________________________
      *
-     *****************************************************************************/
+     *  - obstacleDidCollideWithRemovalNode -- removed obstacle nodes on contact
+     *
+     *  - playerDidCollideWithObstacle -- various results based on obstacle name
+     *
+     *  - playerDidCollideWithFloor -- on first contact it will configure left, right, down swipe gestures
+     *
+     ******************************************************************************************************/
     
     
     func obstacleDidCollideWithRemovalNode(obstacle: SKSpriteNode, removalWall: SKSpriteNode) {
@@ -578,12 +613,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
     func playerDidCollideWithObstacle(player: SKSpriteNode, obstacle: SKSpriteNode) {
         
-        
+
         if(obstacle.name == "wormholeNode"){
             
             print("Collision with Wormhole")
             
-            self.collidedWormhole = obstacle
+            self.collidedObstacle = obstacle
             
             //slow down the player on wormhole collision or sometimes the bounce is wild
             player.physicsBody?.velocity = CGVector(dx: (player.physicsBody?.velocity.dx)! * 0.01, dy:(player.physicsBody?.velocity.dy)! * 0.01)
@@ -594,9 +629,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             
         }else if (obstacle.name == "blackholeNode"){
             
+            self.collidedObstacle = obstacle
+            
             print("Collision with Black Hole")
+            
+            player.physicsBody?.velocity = CGVector(dx: (player.physicsBody?.velocity.dx)! * 0.01, dy:(player.physicsBody?.velocity.dy)! * 0.01)
+            
             hitBlackholeAnimationSetup(position: obstacle.position)
-            self.gameOver()
+
             
         }else if(obstacle.name == "starNode"){
             
@@ -604,29 +644,26 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             
             self.gameOver()
             
+            
         }else if (obstacle.name == "engineNode"){
             
             print("Collision with Engine")
+            player.physicsBody?.velocity = CGVector(dx: (player.physicsBody?.velocity.dx)! * 0.01, dy:(player.physicsBody?.velocity.dy)! * 0.01)
             wormholeEngineAcquired()
             obstacle.removeFromParent()
             
         }
+        
     }
     
-
     
-    func playerDidCollideWithCruisingHeight() {
+    func playerDidCollideWithFloor() {
         
-
         if(startSwipe){
             
             startSwipe = false
             
-            self.moveBackground = true
-            
             startAddingObstacles()
-            startDroppingEngines()
-            
             
             self.swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(self.swipedRight))
             self.swipeRight.direction = .right
@@ -651,34 +688,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /****************************************************************************
      *
-     *  OBSTACLE CONTROL METHODS
+     *  ______________________OBSTACLE CONTROL METHODS___________________________
+     *
+     *  - startAddingObstacles -- forever repeating SKAction to add obstacles key: dropObstacles
+     *  - stopAddingObstacles -- removes the repeating SKAction with key: dropObstacles
+     *
+     *  - pushCurrentObstacles -- applies y-vel vector to current obstacles in scene
+     *  - stopAllObstacles -- sets obstacle velocity to nothing and removes off screen obstacles
+     *  - removeAllObstacles -- removes all obstacle children from scene
+     *
+     *  - stretchCurrentObstacles -- elongates obstacles with a yScale
      *
      *****************************************************************************/
     
     
-    func startDroppingEngines(){
-        
-        engineTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(6.0), repeats: true) { timer in
-            // Add your code here
-            
-            let o = Obstacle(frame: self.frame)
-            let engine = o.addEngine()
-            
-            self.addChild(engine)
-            
-        }
-        
-    }
-    
-    func stopDroppingEngines(){
-        
-        engineTimer.invalidate()
-        
-    }
     
     
     func startAddingObstacles(){
-        
         
         self.run(SKAction.repeatForever(
             SKAction.sequence([
@@ -686,31 +712,40 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 //adjust ,min/max to increase /decrease frequency of obstacle drop
                 SKAction.wait(forDuration: TimeInterval(self.random(min: 0.5, max: 0.7)))
                 ])
-        ), withKey: "drop")
+        ), withKey: "dropObstacles")
     
     }
-    
     
     
     
     func stopAddingObstacles(){
         
-        self.removeAction(forKey: "drop")
+        self.removeAction(forKey: "dropObstacles")
         
     }
     
     
-    func pushCurrentObstacles(scalor: CGFloat){
+    
+    func pushCurrentObstacles(scalor: CGFloat, contact: Bool){
         
         for child in self.children{
             
-            if (child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode"){
+            if (child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode" || child.name == "engineNode"){
                 
                 child.physicsBody?.isDynamic = true
-                child.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+//                child.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
                 child.physicsBody?.affectedByGravity = false
                 child.physicsBody?.velocity = CGVector(dx: 0, dy: -flightSpeed * wormholeScalor * scalor)
                 
+                if (contact){
+                    
+                    child.physicsBody?.categoryBitMask = PhysicsCategory.Obstacle
+                    
+                }else{
+                    
+                    child.physicsBody?.categoryBitMask = PhysicsCategory.None
+                    
+                }
             }
         }
     }
@@ -720,10 +755,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         for child in self.children{
             
-            if (child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode"){
+            if (child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode" || child.name == "engineNode"){
                 
                 
-                if(child.position.y > self.size.height || child.position.y < cruisingHeight){
+                if(child.position.y > self.size.height + player.size.height || child.position.y < self.size.height/3){
                     
                     print("removing child from parent")
                     child.removeFromParent()
@@ -734,7 +769,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                     child.physicsBody?.isDynamic = false
                     
                 }
-//
             }
             
         }
@@ -742,67 +776,57 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     
-
-    func stretchObstacles(){
-        
-        for child in self.children {
-                
-                
-            if((child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode") && (child.position.y < self.size.height && child.position.y > 0)){
-                
-                
-                
-                
-            }
-        }
-    }
     
     
-    
-    func restoreObstacleSphere(){
-        
-        for child in self.children{
-            
-            if ((child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode") && (child.position.y < self.size.height && child.position.y > 0)){
-                
-                
-                
-            }
-        }
-    }
-    
-    
-    /*******************************
+    /*************************************************************************************************************************
      *
-     * WORMHOLE METHODS
+     * __________________________________________WORMHOLE METHODS______________________________________
      *
-     *******************************/
+     *  -wormholeEngineAcquired -- sets global wormholeEngine to true and adds the engine sprite to status bar
+     *
+     *  - wormholeEntered -- fired at collision time with wormhole. Configures world physics for travel
+     *  - wormholeTravel -- fired after player and wormhole are small enough, starts time and starts adding elongated obstacles
+     *
+     *
+     *  - exitWormhole -- called after wormhole timer completes, freezes scene and set up physics for the animation
+     *  - wormholeExited -- called after wormhole is removed from parent. Re-enables normal playing physics and interactions
+     *
+     *  - enterWormholeAnimationSetup -- sets up radialGravityField for animation
+     *  - exitWormholeAnimationSetup -- adds player and wormhole back as children at the proper locations with proper size
+     *
+     **************************************************************************************************************************/
     
     
     
     func wormholeEngineAcquired(){
         
+        self.addEngineImage()
         self.wormholeEngine = true
         
     }
     
     
+    
+    /**********************
+     * --------------------
+     * -- WORMHOLE ENTER --
+     * --------------------
+     **********************/
+    
+    
     func wormholeEntered(){
         
-        collidedWormhole.name = "collidedWormhole"
+        collidedObstacle.name = "collidedWormhole"
         let wormholeYVelocity:CGFloat = 20
         
         moveBackground = false
         
         stopAddingObstacles()
         stopAllObstacles()
-        stopDroppingEngines()
         
-        collidedWormhole.physicsBody?.categoryBitMask = PhysicsCategory.None
-        collidedWormhole.physicsBody?.collisionBitMask = PhysicsCategory.None
-        collidedWormhole.physicsBody?.contactTestBitMask = PhysicsCategory.None
+        collidedObstacle.physicsBody?.categoryBitMask = PhysicsCategory.None
         
-        collidedWormhole.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+        collidedObstacle.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         player.physicsBody?.affectedByGravity = true
         
@@ -816,14 +840,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         exitPoint = player.position
-        enterWormholeAnimationSetup(position: self.collidedWormhole.position)
+        enterWormholeAnimationSetup(position: self.collidedObstacle.position)
     }
 
     
     func startWormholeTravel(){
         
         wormholeTraveling = true
-        pushCurrentObstacles(scalor: 2)
+        pushCurrentObstacles(scalor: 2, contact:false)
         startAddingObstacles()
         moveBackground = true
         
@@ -831,28 +855,46 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
     }
     
+    /**********************
+     *
+     * WORMHOLE EXIT
+     *
+     **********************/
+    
+    
     func wormholeExited(){
         
         
         wormholeEngine = false
+        
+        if(wormholeEngine){
+            hasWormholeEngine.removeFromParent()
+        }
+        
         wormholeTraveling = false
         moveBackground = true
         flightSpeed = 9.0
         
-        player.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: player.size.width - 4, height: player.size.height - 4))
+        //set world physics back to normal
+
+        self.physicsWorld.gravity = CGVector(dx: 0, dy: -9.8)
+        player.physicsBody?.allowsRotation = false
+        player.physicsBody?.affectedByGravity = true
         
-        pushCurrentObstacles(scalor: 1)
+        pushCurrentObstacles(scalor: 1, contact: true)
         startAddingObstacles()
-        startDroppingEngines()
+
     }
+    
+    
     
     
     func exitWormhole(){
         
         wormholeTimer.invalidate()
         
-        self.stopAddingObstacles()
-        self.stopAllObstacles()
+        stopAddingObstacles()
+        stopAllObstacles()
         
         moveBackground = false
         wormholeTraveling = false
@@ -862,22 +904,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     
-    /**************************************************
+    /**********************
      *
-     * WORMHOLE ANIMATION
+     * WORMHOLE ANIMATIONS
      *
-     ***************************************************/
+     **********************/
     
     
     func enterWormholeAnimationSetup(position: CGPoint){
         
+        field = SKFieldNode.radialGravityField()
         shrinkPlayer = true
         
         field.position = position
         field.falloff = -1
         field.smoothness = 4
-        field.strength = 15
-//        field.animationSpeed = 40
+        field.strength = 6
         
         addChild(field)
     
@@ -888,13 +930,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         growPlayer = true
         
-        collidedWormhole.position = exitPoint
+        collidedObstacle.position = exitPoint
         
-        collidedWormhole.size = CGSize(width: (self.size.width / playerScalingFactor) * 0.05, height: (self.size.height / playerScalingFactor) * 0.05)
+        collidedObstacle.size = CGSize(width: (self.size.width / playerScalingFactor) * 0.05, height: (self.size.height / playerScalingFactor) * 0.05)
         
-        self.addPlayer(atPosition: exitPoint, withSize: CGSize(width: (self.size.width / playerScalingFactor) * 0.05, height: (self.size.height / playerScalingFactor) * 0.05))
         
-        addChild(collidedWormhole)
+        player.size = CGSize(width: (self.size.width / playerScalingFactor) * 0.05, height: (self.size.height / playerScalingFactor) * 0.05)
+        player.position = CGPoint(x: exitPoint.x + player.size.width/2, y: exitPoint.y)
+        
+        
+        addChild(player)
+        addChild(collidedObstacle)
 
     }
     
@@ -908,13 +954,30 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     func hitBlackholeAnimationSetup(position: CGPoint){
 
+        field = SKFieldNode.radialGravityField()
+        
+        moveBackground = false
+        
+        stopAddingObstacles()
+        stopAllObstacles()
+        
+        
         shrinkPlayer = true
+        hitBlackhole = true
+        
+        
+        collidedObstacle.name = "collidedBlackhole"
+        collidedObstacle.physicsBody?.categoryBitMask = PhysicsCategory.None
+        collidedObstacle.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+        physicsWorld.gravity = CGVector(dx: 0, dy: 0)
+        player.physicsBody?.affectedByGravity = true
+        
         
         field.position = position
         field.falloff = -1
         field.smoothness = 4
-        field.strength = 40
-//        field.animationSpeed = 40
+        field.strength = 10
+
         
         addChild(field)
         
@@ -949,8 +1012,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 print(child.name! as String)
                 
                 child.physicsBody?.categoryBitMask = PhysicsCategory.None
-                child.physicsBody?.collisionBitMask = PhysicsCategory.None
-                child.physicsBody?.contactTestBitMask = PhysicsCategory.None
+
                 
             }
         }
@@ -973,8 +1035,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 print(child.name! as String)
                 
                 child.physicsBody?.categoryBitMask = PhysicsCategory.Obstacle
-                child.physicsBody?.collisionBitMask = PhysicsCategory.Player
-                child.physicsBody?.contactTestBitMask = PhysicsCategory.Player
                 
             }
         }
@@ -1007,7 +1067,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         var fadeInOut = fade
         pulseTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(pulseDuration), repeats: true) { timer in
-            // Add your code here
             
             if (fadeInOut){
                 
@@ -1026,7 +1085,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /****************************************************************************
      *
-     *  SKVIEW UPDATE DELEGATE METHOD
+     * ____________________ SKVIEW UPDATE DELEGATE METHOD _______________________
      *
      *****************************************************************************/
     
@@ -1037,9 +1096,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         /************************************
          *
-         * SCORE KEEPING
+         * __________ SCORE KEEPING _________
          *
-         * Add scoreNumber to score
+         * ---- Add scoreNumber to score ----
          *
          ************************************/
         
@@ -1050,19 +1109,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             scoreNumber = -1
             
         }
+        
+        
         let scoreDistance = abs(scrollCounter - background1.position.y)
         
-        
-        
-        if (scoreDistance > self.size.height / (playerScalingFactor / 2)){
+        if (scoreDistance > self.size.height / (playerScalingFactor)){
             
             scrollCounter = background1.position.y
             updateScore(scoreNumber: scoreNumber)
             scoreLbl.text = "Score: " + String(describing: self.score)
+            
         }
-        
-        
-        
         
         
         /***********************
@@ -1074,20 +1131,41 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         if(shrinkPlayer){
             
+            
+            //if obstacle is not a black hole, stretch the obstacles in view
+            if(!hitBlackhole){
+                for child in self.children {
+                    
+                    if((child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode" || child.name == "engineNode") && (child.position.y < self.size.height && child.position.y > 0)){
+                        
+                        if(child.yScale < 2){
+                            child.yScale  = child.yScale + 0.01
+                            child.xScale = child.xScale + 0.005
+                        }
+                    }
+                }
+            }
+            
+            
             if(player.size.height > self.size.height / 45  && player.size.width > self.size.width / 45){
                 
-                player.size = CGSize(width: player.size.width - 0.6 ,height: player.size.height - 1.0)
+                player.size = CGSize(width: player.size.width - player.size.width/45 ,height: player.size.height - player.size.height/45)
 
                 
-            }else{
+            }else if (hitBlackhole){
                 
-                if (collidedWormhole.size.height > self.size.height / 45  && collidedWormhole.size.width > self.size.width / 45){
+                self.gameOver()
+                
+            }else{
+            
+            
+                if (collidedObstacle.size.height > self.size.height / 45  && collidedObstacle.size.width > self.size.width / 45){
                     
-                    collidedWormhole.size = CGSize(width: collidedWormhole.size.width - wormholeInc ,height: collidedWormhole.size.height - wormholeInc)
+                    collidedObstacle.size = CGSize(width: collidedObstacle.size.width - wormholeInc ,height: collidedObstacle.size.height - wormholeInc)
                     
                 }else{
                     
-                    collidedWormhole.removeFromParent()
+                    collidedObstacle.removeFromParent()
                     player.removeFromParent()
                     field.removeFromParent()
                     
@@ -1101,10 +1179,24 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         if(growPlayer){
             
-            
-            if (collidedWormhole.size.width < (self.size.width / playerScalingFactor ) * 3) {
+            //shrink obstacles in view
+            for child in self.children {
                 
-                collidedWormhole.size = CGSize(width: collidedWormhole.size.width + wormholeInc ,height: collidedWormhole.size.height + wormholeInc)
+                if((child.name == "wormholeNode" || child.name == "blackholeNode" || child.name == "starNode" || child.name == "engineNode") && (child.position.y < self.size.height && child.position.y > 0)){
+                    
+                    if(child.yScale > 0.5){
+                        child.yScale  = child.yScale - 0.01
+                    }
+                    
+                    
+                }
+            }
+            
+            
+            //player/wormhole growth
+            if (collidedObstacle.size.width < (self.size.width / playerScalingFactor ) * 3) {
+                
+                collidedObstacle.size = CGSize(width: collidedObstacle.size.width + wormholeInc ,height: collidedObstacle.size.height + wormholeInc)
                 
             }else{
                 
@@ -1127,13 +1219,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         if(shrinkWormhole){
             
-            if (collidedWormhole.size.width > (player.size.width) / 45) {
+            if (collidedObstacle.size.width > (player.size.width) / 45) {
                 
-                collidedWormhole.size = CGSize(width: collidedWormhole.size.width - wormholeInc ,height: collidedWormhole.size.height - wormholeInc)
+                collidedObstacle.size = CGSize(width: collidedObstacle.size.width - wormholeInc ,height: collidedObstacle.size.height - wormholeInc)
                 
             }else{
                 
-                collidedWormhole.removeFromParent()
+                collidedObstacle.removeFromParent()
                 shrinkWormhole = false
                 
                 wormholeExited()
@@ -1252,7 +1344,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     func gameOver(){
         
-        stopAllObstacles()
+//        stopAllObstacles()
         stopAddingObstacles()
         engineTimer.invalidate()
         
